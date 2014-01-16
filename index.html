@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html>
+  <style>
+    body, html{ margin: 0;}
+    .hud{
+      position: absolute;
+      left: 10px;
+      top: 10px;
+    }
+  </style>
+  <body>
+  <div class="time"></div>
+  <script src="d3.js"></script>
+  <script src="dz.js"></script>
+  <script>
+
+var p = dz.projection.perspective()
+  , camera = p.camera().position([0, 1, 3]).focalLength(1).lookAt([0, 1, 1])
+  , w = window.innerWidth
+  , h = window.innerHeight
+  , svg = d3.select('body').append('svg').attr({width: w, height: h})
+  , max = Math.max(w, h), min = Math.min(w, h), diff = max - min
+  // screen scaling
+  , ranges = [ [0, max] , [ - diff / 2, max - diff / 2] ]
+  , screenX = d3.scale.linear().domain([-1, 1]).range(ranges[w < h ? 1 : 0])
+  , screenY = d3.scale.linear().domain([1, -1]).range(ranges[w > h ? 1 : 0])
+
+// update the transform on the circle
+
+d3.csv('data.csv', function(d){
+  var body = {
+    elbow: [d.ElbowLeft_X, d.ElbowLeft_Y, d.ElbowLeft_Z],
+    hand_left: [d.HandLeft_X, d.HandLeft_Y, d.HandLeft_Z],
+    hand_right: [d.HandRight_X, d.HandRight_Y, d.HandRight_Z],
+    head: [d.Head_X, d.Head_Y, d.Head_Z],
+    shoulder_center: [d.ShoulderCenter_X, d.ShoulderCenter_Y, d.ShoulderCenter_Z],
+    shoulder_left: [d.ShoulderLeft_X, d.ShoulderLeft_Y, d.ShoulderLeft_Z],
+    should_right: [d.ShoulderRight_X, d.ShoulderRight_Y, d.ShoulderRight_Z],
+    time: d.Time
+  }
+  var parts = Object.keys(body)
+  parts.forEach(function(part){
+    if(part === 'time') return
+    body[part] = body[part].map(Number)
+  })
+  return body
+}, function(err, data){
+  if(err) throw err
+  
+  var parts = Object.keys(data[0])
+    .filter(function(part){ return part !== 'time' })
+  parts = svg.selectAll('circle').data(parts)
+    .enter().append('circle')
+
+  var i = 0
+  setInterval(function(){
+    if(i >= data.length) i = 0
+    var body = data[i++] // the current body part positions
+    // d3.select('.time').text('' + body.time)
+    parts
+      .attr('cx', function(d){ return screenX(p.x(body[d]))})
+      .attr('cy', function(d){ return screenX(p.y(body[d]))})
+      .attr('r', function(d){ return p.scale(body[d]) * 20 })
+  }, 10)
+})
+
+  </script>
+  </body>
+</html>
