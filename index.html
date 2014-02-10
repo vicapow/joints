@@ -10,6 +10,10 @@
     text{
       opacity: 0.4;
     }
+    line{
+      stroke: black;
+      stroke-width: 1;
+    }
   </style>
   <body>
   <div class="time"></div>
@@ -18,7 +22,7 @@
   <script>
 
 var p = dz.projection.perspective()
-  , pos = [0, 0, 4]
+  , pos = [0, 0, 0]
   , camera = p.camera().position(pos).focalLength(1).lookAt([0, 0, 1])
   , w = window.innerWidth
   , h = window.innerHeight
@@ -39,37 +43,23 @@ var drag = d3.behavior.drag()
 
 svg.call(drag)
 
-d3.csv('data.csv', function(d, i){
-  if(i === 0) console.log(d)
-  var body = {
-      hand_left: [d.HandLeft_X, d.HandLeft_Y, d.HandLeft_Z, d.HandLeft_Status === 'Tracked']
-    , wrist_left: [d.WristLeft_Y, d.WristLeft_Y, d.WristLeft_Z, d.WristLeft_Status === 'Tracked']
-    , wrist_right: [d.WristRight_Y, d.WristRight_Y, d.WristRight_Z, d.WristRight_Status === 'Tracked']
-    , hand_right: [d.HandRight_X, d.HandRight_Y, d.HandRight_Z, d.HandRight_Status === 'Tracked']
-    , elbow_left: [d.ElbowLeft_X, d.ElbowLeft_Y, d.ElbowLeft_Z, d.ElbowLeft_Status === 'Tracked']
-    , elbow_right: [d.ElbowRight_X, d.ElbowRight_Y, d.ElbowRight_Z, d.ElbowRight_Status === 'Tracked']
-    , shoulder_center: [d.ShoulderCenter_X, d.ShoulderCenter_Y, d.ShoulderCenter_Z, d.ShoulderCenter_Status === 'Tracked']
-    , shoulder_left: [d.ShoulderLeft_X, d.ShoulderLeft_Y, d.ShoulderLeft_Z, d.ShoulderLeft_Status === 'Tracked']
-    , should_right: [d.ShoulderRight_X, d.ShoulderRight_Y, d.ShoulderRight_Z, d.ShoulderRight_Status === 'Tracked']
-    , head: [d.Head_X, d.Head_Y, d.Head_Z, d.Head_Status === 'Tracked']
-    , time: d.Time
-  }
-  var parts = Object.keys(body)
-  parts.forEach(function(part){
-    if(part === 'time') return
-    body[part] = body[part].map(Number)
-  })
-  return body
-}, function(err, data){
+d3.csv('data.csv', format_row, function(err, data){
   if(err) throw err
+
+  // 'time' is not a body part
   var parts = Object.keys(data[0])
     .filter(function(part){ return part !== 'time' })
-  
+  // add a `<g>` tag for each body part
   parts = svg.selectAll('g').data(parts).enter().append('g')
-
+  // each body part also has a dot that represents its location
   parts.append('circle')
+  // and a label for its name
   parts.append('text').text(function(d){ return d })
     .attr('x', 10).attr('y', 10)
+
+  // joints
+  var joints = svg.selectAll('line').data(joints_data)
+    .enter().append('line')
 
   var i = 0
   setInterval(function(){
@@ -82,10 +72,63 @@ d3.csv('data.csv', function(d, i){
         var y = screenY(p.y(body[d]))
         return 'translate(' + x + ',' + y + ')'
       })
-      .select('circle').attr('r', function(d){ return p.scale(body[d]) * 20 })
-    parts.select('text').text(function(d){ return d + ' : ' + (body[d][3] ? 'tracked' : 'inferred') })
-  }, 10)
+      .select('circle').attr('r', function(d){ return p.scale(body[d]) * 10 })
+        .style('fill', function(d){ return body[d][3] ? 'green' : 'red' })
+    parts.select('text').text(function(d){ return d.replace('_', ' ') })
+
+    joints.attr({
+        x1: function(d){ return screenX(p.x(body[d[0]])) }
+      , y1: function(d){ return screenY(p.y(body[d[0]])) }
+      , x2: function(d){ return screenX(p.x(body[d[1]])) }
+      , y2: function(d){ return screenY(p.y(body[d[1]])) }
+    })
+
+  }, 35)
 })
+
+var joints_data = [
+    ['head', 'shoulder_center']
+  , ['shoulder_center', 'shoulder_right']
+  , ['shoulder_center', 'shoulder_left']
+  , ['shoulder_left', 'elbow_left']
+  , ['shoulder_right', 'elbow_right']
+  , ['elbow_left', 'wrist_left']
+  , ['elbow_right', 'wrist_right']
+  , ['wrist_left', 'hand_left']
+  , ['wrist_right', 'hand_right']
+]
+
+function compose_part(d, name){
+  return [
+      d[name + '_X']
+    , d[name + '_Y']
+    , d[name + '_Z']
+    , d[name + '_Status'].indexOf('Tracked') !== -1
+  ]
+}
+
+function format_row(d, i){
+  var compose = compose_part.bind(null, d)
+  var body = {
+      hand_left:       compose('HandLeft')
+    , wrist_left:      compose('WristLeft')
+    , wrist_right:     compose('WristRight')
+    , hand_right:      compose('HandRight')
+    , elbow_left:      compose('ElbowLeft')
+    , elbow_right:     compose('ElbowRight')
+    , shoulder_center: compose('ShoulderCenter')
+    , shoulder_left:   compose('ShoulderLeft')
+    , shoulder_right:    compose('ShoulderRight')
+    , head:            compose('Head')
+    , time:            d.Time
+  }
+  var parts = Object.keys(body)
+  parts.forEach(function(part){
+    if(part === 'time') return
+    body[part] = body[part].map(Number)
+  })
+  return body
+}
 
   </script>
   </body>
