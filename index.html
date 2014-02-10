@@ -7,6 +7,9 @@
       left: 10px;
       top: 10px;
     }
+    text{
+      opacity: 0.4;
+    }
   </style>
   <body>
   <div class="time"></div>
@@ -15,7 +18,8 @@
   <script>
 
 var p = dz.projection.perspective()
-  , camera = p.camera().position([0, 1, 3]).focalLength(1).lookAt([0, 1, 1])
+  , pos = [0, 0, 4]
+  , camera = p.camera().position(pos).focalLength(1).lookAt([0, 0, 1])
   , w = window.innerWidth
   , h = window.innerHeight
   , svg = d3.select('body').append('svg').attr({width: w, height: h})
@@ -25,18 +29,30 @@ var p = dz.projection.perspective()
   , screenX = d3.scale.linear().domain([-1, 1]).range(ranges[w < h ? 1 : 0])
   , screenY = d3.scale.linear().domain([1, -1]).range(ranges[w > h ? 1 : 0])
 
-// update the transform on the circle
 
-d3.csv('data.csv', function(d){
+var drag = d3.behavior.drag()
+  .on('drag', function(d, i){
+    var dx = d3.event.dx / w * Math.PI * 2
+      , dy = d3.event.dy / h * Math.PI * 2
+    pos = dz.matrix().rotateX(dy).rotateY(dx).multiVector(pos)
+  })
+
+svg.call(drag)
+
+d3.csv('data.csv', function(d, i){
+  if(i === 0) console.log(d)
   var body = {
-    elbow: [d.ElbowLeft_X, d.ElbowLeft_Y, d.ElbowLeft_Z],
-    hand_left: [d.HandLeft_X, d.HandLeft_Y, d.HandLeft_Z],
-    hand_right: [d.HandRight_X, d.HandRight_Y, d.HandRight_Z],
-    head: [d.Head_X, d.Head_Y, d.Head_Z],
-    shoulder_center: [d.ShoulderCenter_X, d.ShoulderCenter_Y, d.ShoulderCenter_Z],
-    shoulder_left: [d.ShoulderLeft_X, d.ShoulderLeft_Y, d.ShoulderLeft_Z],
-    should_right: [d.ShoulderRight_X, d.ShoulderRight_Y, d.ShoulderRight_Z],
-    time: d.Time
+      hand_left: [d.HandLeft_X, d.HandLeft_Y, d.HandLeft_Z, d.HandLeft_Status === 'Tracked']
+    , wrist_left: [d.WristLeft_Y, d.WristLeft_Y, d.WristLeft_Z, d.WristLeft_Status === 'Tracked']
+    , wrist_right: [d.WristRight_Y, d.WristRight_Y, d.WristRight_Z, d.WristRight_Status === 'Tracked']
+    , hand_right: [d.HandRight_X, d.HandRight_Y, d.HandRight_Z, d.HandRight_Status === 'Tracked']
+    , elbow_left: [d.ElbowLeft_X, d.ElbowLeft_Y, d.ElbowLeft_Z, d.ElbowLeft_Status === 'Tracked']
+    , elbow_right: [d.ElbowRight_X, d.ElbowRight_Y, d.ElbowRight_Z, d.ElbowRight_Status === 'Tracked']
+    , shoulder_center: [d.ShoulderCenter_X, d.ShoulderCenter_Y, d.ShoulderCenter_Z, d.ShoulderCenter_Status === 'Tracked']
+    , shoulder_left: [d.ShoulderLeft_X, d.ShoulderLeft_Y, d.ShoulderLeft_Z, d.ShoulderLeft_Status === 'Tracked']
+    , should_right: [d.ShoulderRight_X, d.ShoulderRight_Y, d.ShoulderRight_Z, d.ShoulderRight_Status === 'Tracked']
+    , head: [d.Head_X, d.Head_Y, d.Head_Z, d.Head_Status === 'Tracked']
+    , time: d.Time
   }
   var parts = Object.keys(body)
   parts.forEach(function(part){
@@ -46,21 +62,28 @@ d3.csv('data.csv', function(d){
   return body
 }, function(err, data){
   if(err) throw err
-  
   var parts = Object.keys(data[0])
     .filter(function(part){ return part !== 'time' })
-  parts = svg.selectAll('circle').data(parts)
-    .enter().append('circle')
+  
+  parts = svg.selectAll('g').data(parts).enter().append('g')
+
+  parts.append('circle')
+  parts.append('text').text(function(d){ return d })
+    .attr('x', 10).attr('y', 10)
 
   var i = 0
   setInterval(function(){
     if(i >= data.length) i = 0
     var body = data[i++] // the current body part positions
     // d3.select('.time').text('' + body.time)
-    parts
-      .attr('cx', function(d){ return screenX(p.x(body[d]))})
-      .attr('cy', function(d){ return screenX(p.y(body[d]))})
-      .attr('r', function(d){ return p.scale(body[d]) * 20 })
+    camera.position(pos)
+    parts.attr('transform', function(d){
+        var x = screenX(p.x(body[d]))
+        var y = screenY(p.y(body[d]))
+        return 'translate(' + x + ',' + y + ')'
+      })
+      .select('circle').attr('r', function(d){ return p.scale(body[d]) * 20 })
+    parts.select('text').text(function(d){ return d + ' : ' + (body[d][3] ? 'tracked' : 'inferred') })
   }, 10)
 })
 
