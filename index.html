@@ -66,19 +66,19 @@ var p = dz.projection.perspective()
 // svg.call(drag)
 
 
-d3.csv('data.csv', format_row, function(err, data){
+d3.csv('Ed_Left-Pointing.csv', format_row, function(err, data){
   if(err) throw err
   play(data)
 })
 
-d3.select('button').on('click', function(){
+d3.select('button').on('click', function() {
   var text = d3.select('textarea.csv').node().value
   var data = d3.csv.parse(text, format_row)
   if(!data.length) return alert('no data to load!')
   play(data)
 })
 
-function play(data){
+function play(data) {
   svg.selectAll('*').remove()
   clearInterval(interval_id)
 
